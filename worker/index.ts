@@ -1,7 +1,5 @@
-export interface Env {}
-
 const SEC_HEADERS = {
-  'User-Agent': 'OpenFilings portfolio project contact@example.com',
+  'User-Agent': 'OpenFilings/1.0 4j4yk@users.noreply.github.com',
   'Accept-Encoding': 'gzip, deflate',
 };
 const CORS = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'GET, OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type' };
@@ -21,7 +19,7 @@ function annualFacts(data:CompanyFacts, concepts:string[]) {
 }
 function formatMoney(value?:number){if(value==null)return'—';if(Math.abs(value)>=1e9)return`$${(value/1e9).toFixed(1)}B`;if(Math.abs(value)>=1e6)return`$${(value/1e6).toFixed(1)}M`;return`$${value.toLocaleString('en-US')}`}
 
-export default {
+const worker = {
   async fetch(request:Request):Promise<Response>{
     if(request.method==='OPTIONS')return new Response(null,{status:204,headers:CORS});
     const url=new URL(request.url); const match=url.pathname.match(/^\/company\/(\d{10})$/);
@@ -43,4 +41,6 @@ export default {
       return Response.json({company:{name:submissions.name||facts.entityName,sector:submissions.sicDescription,ticker:submissions.tickers?.[0],exchange:submissions.exchanges?.[0]},metrics:{revenue:formatMoney(latest(revenue)),revenueChange:change(revenue),income:formatMoney(latest(income)),incomeChange:change(income),assets:formatMoney(latest(assets)),assetsChange:change(assets)},revenue:revenue.map(p=>({year:p.year,revenue:Math.round(p.value/1e9)})),filings},{headers:{...CORS,'Cache-Control':'public, max-age=900'}});
     }catch{return Response.json({error:'Unable to retrieve SEC data right now.'},{status:502,headers:CORS})}
   }
-};
+} satisfies ExportedHandler;
+
+export default worker;

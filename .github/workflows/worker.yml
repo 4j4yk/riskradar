@@ -1,9 +1,6 @@
 name: Deploy SEC data worker
 
 on:
-  push:
-    branches: [main]
-    paths: ['worker/**']
   workflow_dispatch:
 
 jobs:
