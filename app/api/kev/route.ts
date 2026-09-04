@@ -1,0 +1,37 @@
+import { NextResponse } from "next/server";
+
+const URL = "https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json";
+type Item = { cveID:string; vendorProject:string; product:string; vulnerabilityName:string; shortDescription:string; dateAdded:string; dueDate:string; knownRansomwareCampaignUse:string; requiredAction:string; cwes?:string[] };
+type Feed = { catalogVersion:string; dateReleased:string; vulnerabilities:Item[] };
+
+function score(v:Item) {
+  let n=58, now=Date.now();
+  const due=Math.ceil((new Date(v.dueDate+"T23:59:59Z").getTime()-now)/86400000);
+  const age=Math.floor((now-new Date(v.dateAdded+"T00:00:00Z").getTime())/86400000);
+  if(v.knownRansomwareCampaignUse==="Known") n+=24;
+  if(due<0) n+=13; else if(due<=7) n+=9;
+  if(age<=30) n+=7;
+  n=Math.min(100,n);
+  return {riskScore:n,priority:n>=90?"Critical":n>=75?"High":"Elevated"};
+}
+
+export async function GET() {
+  try {
+    const r=await fetch(URL,{headers:{Accept:"application/json","User-Agent":"RiskRadar/1.0 (+https://github.com/4j4yk)"}});
+    if(!r.ok) throw new Error("CISA returned "+r.status);
+    const f=await r.json() as Feed;
+    const vulnerabilities=f.vulnerabilities.map(v=>({
+      cve:v.cveID,vendor:v.vendorProject,product:v.product,name:v.vulnerabilityName,
+      description:v.shortDescription,added:v.dateAdded,due:v.dueDate,
+      ransomware:v.knownRansomwareCampaignUse==="Known",action:v.requiredAction,
+      cwes:v.cwes??[],...score(v)
+    })).sort((a,b)=>b.riskScore-a.riskScore||b.added.localeCompare(a.added));
+    return NextResponse.json(
+      {catalogVersion:f.catalogVersion,dateReleased:f.dateReleased,count:vulnerabilities.length,vulnerabilities},
+      {headers:{"Cache-Control":"public, s-maxage=3600, stale-while-revalidate=86400"}}
+    );
+  } catch(e) {
+    console.error("CISA KEV feed failed",e);
+    return NextResponse.json({error:"CISA KEV feed unavailable"},{status:502});
+  }
+}
